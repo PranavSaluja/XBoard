@@ -5,9 +5,16 @@ dotenv.config();
 
 const { Pool } = pkg;
 
-export const pool = new Pool({
+// CRITICAL FIX: Add SSL configuration for Render
+const poolConfig = {
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/shopdb',
-});
+  // SSL configuration for Render deployment
+  ssl: process.env.DATABASE_URL ? {
+    rejectUnauthorized: false // Required for Render's default SSL certs
+  } : false // Local development typically doesn't need SSL
+};
+
+export const pool = new Pool(poolConfig);
 
 // Optional: simple helper to test connection
 export async function testConnection() {
