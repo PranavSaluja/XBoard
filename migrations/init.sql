@@ -95,6 +95,14 @@ CREATE TABLE IF NOT EXISTS product_variants (
   UNIQUE (tenant_id, shopify_variant_id)
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  tenant_id INT REFERENCES tenants(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_product_variants_tenant_id ON product_variants (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_product_variants_product_shopify_id ON product_variants (product_shopify_id);
 
