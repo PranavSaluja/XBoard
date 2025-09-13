@@ -5,7 +5,13 @@ export class ShopifyAPI {
   constructor(shopDomain, accessToken) {
     this.shopDomain = shopDomain;
     this.accessToken = accessToken;
-    this.baseURL = `https://${shopDomain}/admin/api/2023-10/`;
+
+    // CRITICAL FIX: remove https:// prefix if it exists
+    const cleanedShopDomain = shopDomain.startsWith('https://')
+      ? shopDomain.substring('https://'.length)
+      : shopDomain;
+
+    this.baseURL = `https://${cleanedShopDomain}/admin/api/2023-10/`;
   }
 
   async makeRequest(endpoint, options = {}) {

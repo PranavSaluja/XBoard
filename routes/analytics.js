@@ -1,15 +1,35 @@
 // routes/analytics.js
 import express from 'express';
 import { pool } from '../db.js';
+import { authenticateToken } from './auth.js';
+import { DataIngestionService } from '../services/dataIngestion.js';
 
 const router = express.Router();
 
-// Get dashboard overview for a tenant
-router.get('/tenants/:tenantId/overview', async (req, res) => {
-  const { tenantId } = req.params;
+// Apply authentication to all analytics routes
+router.use(authenticateToken);
+
+// Get current user's tenant info
+router.get('/me', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.email, t.shop_domain, t.status, t.installed_at
+      FROM users u
+      JOIN tenants t ON u.tenant_id = t.id
+      WHERE u.id = $1
+    `, [req.user.userId]);
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get dashboard overview (only for user's tenant)
+router.get('/overview', async (req, res) => {
+  const tenantId = req.user.tenantId; // Get from JWT, not URL
   
   try {
-    // Total customers, orders, and revenue
     const overview = await pool.query(`
       SELECT 
         (SELECT COUNT(*) FROM customers WHERE tenant_id = $1) as total_customers,
@@ -25,9 +45,9 @@ router.get('/tenants/:tenantId/overview', async (req, res) => {
   }
 });
 
-// Get orders by date with optional date range filtering
-router.get('/tenants/:tenantId/orders-by-date', async (req, res) => {
-  const { tenantId } = req.params;
+// Get orders by date (only for user's tenant)
+router.get('/orders-by-date', async (req, res) => {
+  const tenantId = req.user.tenantId;
   const { startDate, endDate } = req.query;
   
   try {
@@ -57,13 +77,11 @@ router.get('/tenants/:tenantId/orders-by-date', async (req, res) => {
   }
 });
 
-// Get top 5 customers by spend
-router.get('/tenants/:tenantId/top-customers', async (req, res) => {
-  const { tenantId } = req.params;
+// Get top customers (only for user's tenant)
+router.get('/top-customers', async (req, res) => {
+  const tenantId = req.user.tenantId;
   
   try {
-    // This requires linking customers to orders via shopify_customer_id
-    // First, let's see if we have customer info in orders
     const result = await pool.query(`
       SELECT 
         COALESCE(c.email, 'Guest Customer') as customer_email,
@@ -85,9 +103,9 @@ router.get('/tenants/:tenantId/top-customers', async (req, res) => {
   }
 });
 
-// Get recent orders
-router.get('/tenants/:tenantId/recent-orders', async (req, res) => {
-  const { tenantId } = req.params;
+// Get recent orders (only for user's tenant)
+router.get('/recent-orders', async (req, res) => {
+  const tenantId = req.user.tenantId;
   const limit = req.query.limit || 10;
   
   try {
@@ -110,5 +128,28 @@ router.get('/tenants/:tenantId/recent-orders', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+router.post('/sync', async (req, res) => {
+    const tenantId = req.user.tenantId; // Get tenantId from the authenticated user's JWT
+    
+    try {
+      const tenantResult = await pool.query('SELECT shop_domain, encrypted_admin_token FROM tenants WHERE id = $1', [tenantId]);
+      if (tenantResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Tenant not found or inactive' });
+      }
+      
+      const tenant = tenantResult.rows[0];
+      
+      // Instantiate ingestion service and use the tenant's stored token
+      const ingestionService = new DataIngestionService();
+      await ingestionService.ingestTenantData(tenantId, tenant.shop_domain, tenant.encrypted_admin_token);
+      
+      res.json({ success: true, message: 'Data sync initiated successfully.' });
+      
+    } catch (error) {
+      console.error(`Sync failed for tenant ${tenantId}:`, error);
+      res.status(500).json({ error: error.message || 'Data sync failed' });
+    }
+  });
 
 export default router;
