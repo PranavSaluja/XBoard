@@ -1,24 +1,38 @@
-// backend/server.js
+// server.js
 import express from 'express';
 import dotenv from 'dotenv';
-import analyticsRoutes from './routes/analytics.js';
-import authRoutes from './routes/auth.js';
 import cors from 'cors';
 dotenv.config();
 
-import { pool, testConnection } from './db.js'; // <-- ENSURE THIS IS './db.js'
-import bodyParser from 'body-parser';
+import analyticsRoutes from './routes/analytics.js';
+import authRoutes from './routes/auth.js';
+import webhookRoutes from './routes/webhooks.js';
+import { pool, testConnection } from './db.js';
 
 const app = express();
+const PORT = process.env.PORT || 3001;
+
+console.log('DEBUG: process.env.BACKEND_URL:', process.env.BACKEND_URL);
+
+// CORS
 app.use(cors({
   origin: '*', 
   credentials: true
 }));
-const PORT = process.env.PORT || 3001;
 
+// Raw body parser for webhooks FIRST (before other parsers)
+app.use('/api/webhooks', express.raw({ 
+  type: 'application/json',
+  limit: '1mb'
+}));
+
+// Webhook routes (no auth, raw body)
+app.use('/api/webhooks', webhookRoutes);
+
+// Regular JSON parser for other routes
 app.use(express.json());
 
-// Routes
+// Protected routes
 app.use('/api/auth', authRoutes);
 app.use('/api', analyticsRoutes);
 
@@ -34,11 +48,8 @@ app.get('/dbtest', async (req, res) => {
   }
 });
 
-// Webhooks (no auth needed)
-app.post('/webhooks', bodyParser.raw({ type: 'application/json' }), (req, res) => {
-  res.status(200).send('ok');
-});
-
 app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  const webhookTestUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/webhooks/test`;
+  console.log(`📡 Webhook endpoint: ${webhookTestUrl}`);
 });

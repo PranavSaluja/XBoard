@@ -21,13 +21,14 @@ router.get('/me', async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (error) {
+    console.error('❌ /me query failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get dashboard overview (only for user's tenant)
 router.get('/overview', async (req, res) => {
-  const tenantId = req.user.tenantId; // Get from JWT, not URL
+  const tenantId = req.user.tenantId;
   
   try {
     const overview = await pool.query(`
@@ -40,7 +41,7 @@ router.get('/overview', async (req, res) => {
     
     res.json(overview.rows[0]);
   } catch (error) {
-    console.error('Overview query failed:', error);
+    console.error('❌ Overview query failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -72,7 +73,7 @@ router.get('/orders-by-date', async (req, res) => {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('Orders by date query failed:', error);
+    console.error('❌ Orders by date query failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -89,7 +90,7 @@ router.get('/top-customers', async (req, res) => {
         COUNT(o.id) as order_count,
         SUM(o.total_price) as total_spent
       FROM orders o
-      LEFT JOIN customers c ON o.tenant_id = c.tenant_id 
+      LEFT JOIN customers c ON o.tenant_id = c.tenant_id AND o.customer_email = c.email
       WHERE o.tenant_id = $1
       GROUP BY c.email, c.name
       ORDER BY total_spent DESC
@@ -98,7 +99,7 @@ router.get('/top-customers', async (req, res) => {
     
     res.json(result.rows);
   } catch (error) {
-    console.error('Top customers query failed:', error);
+    console.error('❌ Top customers query failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -124,32 +125,67 @@ router.get('/recent-orders', async (req, res) => {
     
     res.json(result.rows);
   } catch (error) {
-    console.error('Recent orders query failed:', error);
+    console.error('❌ Recent orders query failed:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post('/sync', async (req, res) => {
-    const tenantId = req.user.tenantId; // Get tenantId from the authenticated user's JWT
+// Get webhook status and recent events
+router.get('/webhook-status', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  
+  try {
+    const eventsResult = await pool.query(`
+      SELECT id, event_type, shopify_id, processed_at 
+      FROM webhook_events 
+      WHERE tenant_id = $1 
+      ORDER BY processed_at DESC 
+      LIMIT 10
+    `, [tenantId]);
     
-    try {
-      const tenantResult = await pool.query('SELECT shop_domain, encrypted_admin_token FROM tenants WHERE id = $1', [tenantId]);
-      if (tenantResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Tenant not found or inactive' });
-      }
-      
-      const tenant = tenantResult.rows[0];
-      
-      // Instantiate ingestion service and use the tenant's stored token
-      const ingestionService = new DataIngestionService();
-      await ingestionService.ingestTenantData(tenantId, tenant.shop_domain, tenant.encrypted_admin_token);
-      
-      res.json({ success: true, message: 'Data sync initiated successfully.' });
-      
-    } catch (error) {
-      console.error(`Sync failed for tenant ${tenantId}:`, error);
-      res.status(500).json({ error: error.message || 'Data sync failed' });
+    // Check if webhook registration info is stored in the tenant table
+    const tenantWebhookConfigResult = await pool.query(
+      'SELECT webhook_registration FROM tenants WHERE id = $1', [tenantId]
+    );
+    const storedWebhookConfig = tenantWebhookConfigResult.rows[0]?.webhook_registration;
+    
+    // Webhooks are considered 'active' if they were successfully registered (config stored)
+    // AND there's been recent activity, OR just that they were successfully registered
+    const webhooksConsideredActive = (storedWebhookConfig && storedWebhookConfig.length > 0); 
+    
+    res.json({
+      webhooks_active: webhooksConsideredActive,
+      last_webhook_event: eventsResult.rows[0]?.processed_at || null,
+      webhook_count: eventsResult.rows.length,
+      events: eventsResult.rows
+    });
+  } catch (error) {
+    console.error('❌ Webhook status error:', error);
+    res.status(500).json({ error: 'Failed to get webhook status' });
+  }
+});
+
+// Manual sync endpoint
+router.post('/sync', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  
+  try {
+    const tenantResult = await pool.query('SELECT shop_domain, encrypted_admin_token FROM tenants WHERE id = $1', [tenantId]);
+    if (tenantResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found or inactive' });
     }
-  });
+    
+    const tenant = tenantResult.rows[0];
+    
+    const ingestionService = new DataIngestionService();
+    await ingestionService.ingestTenantData(tenantId, tenant.shop_domain, tenant.encrypted_admin_token);
+    
+    res.json({ success: true, message: 'Data sync initiated successfully.' });
+    
+  } catch (error) {
+    console.error(`❌ Sync failed for tenant ${tenantId}:`, error);
+    res.status(500).json({ error: error.message || 'Data sync failed' });
+  }
+});
 
 export default router;
