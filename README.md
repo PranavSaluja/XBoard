@@ -16,6 +16,8 @@ This repository contains the backend service for XBoard, a multi-tenant Shopify 
 <img width="1122" height="452" alt="Screenshot 2025-09-15 at 10 56 37 PM" src="https://github.com/user-attachments/assets/cf50f23a-325b-43f2-bb03-708e0d10ded5" />
 <img width="1528" height="505" alt="Screenshot 2025-09-15 at 10 56 59 PM" src="https://github.com/user-attachments/assets/3d2fcec2-f13e-4681-b325-58f348bd0810" />
 
+## High Level Design 
+<img width="1057" height="659" alt="Screenshot 2025-09-15 at 11 28 52 PM" src="https://github.com/user-attachments/assets/58209ef6-598d-497e-ac7d-003db07a6ecd" />
 
 
 
