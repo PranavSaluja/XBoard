@@ -12,6 +12,13 @@ This repository contains the backend service for XBoard, a multi-tenant Shopify 
 *   **Data Synchronization:** Provides an authenticated API endpoint to trigger manual data synchronization from Shopify for the logged-in user's store.
 *   **Analytics Endpoints:** Exposes secure API endpoints to retrieve aggregated and detailed analytics data for an authenticated user's specific Shopify store.
 
+  ## Application Flow 
+<img width="1122" height="452" alt="Screenshot 2025-09-15 at 10 56 37 PM" src="https://github.com/user-attachments/assets/cf50f23a-325b-43f2-bb03-708e0d10ded5" />
+<img width="1528" height="505" alt="Screenshot 2025-09-15 at 10 56 59 PM" src="https://github.com/user-attachments/assets/3d2fcec2-f13e-4681-b325-58f348bd0810" />
+
+
+
+
 ## Setup Instructions
 
 ### Prerequisites
