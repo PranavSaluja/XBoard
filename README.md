@@ -1,6 +1,6 @@
 # data-ingestion-backend
 
-This repository contains the backend service for XBoard, a multi-tenant Shopify data ingestion and analytics platform. Built with Node.js and Express.js, this service connects to Shopify stores, ingests critical e-commerce data (customers, orders, products), stores it in a PostgreSQL database, and provides secure, authenticated APIs for frontend applications.
+This repository contains the backend service for XBoard, a multi-tenant Shopify data ingestion and analytics platform. Built with Node.js and Express.js, The application acts as a bridge between Shopify stores and a customizable analytics dashboard. It allows multiple Shopify store owners (tenants) to connect their stores, ingesting their customer, order, and product data. It provides real-time updates and historical insights through a personalized dashboard, while maintaining strict data isolation between tenants.
 
 ## Core Features
 
